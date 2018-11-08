@@ -1,0 +1,21 @@
+FROM scratch
+
+LABEL maintainer="Maxim Kondratenko"
+LABEL summary="Image for Porta's SIP/BE logs anonymizer"
+
+ARG PORTA_GIT_COMMIT=unspecified
+ARG PORTA_GIT_TAG=unspecified
+ARG PORTA_GIT_BRANCH=master
+ARG PORTA_APP_NAME='ba-logs-anonymizer'
+
+ENV PORTA_GIT_TAG=$PORTA_GIT_TAG
+ENV PORTA_GIT_COMMIT=$PORTA_GIT_COMMIT
+ENV PORTA_APP_NAME=$PORTA_APP_NAME
+
+LABEL PORTA_GIT_TAG=$PORTA_GIT_TAG
+LABEL PORTA_GIT_COMMIT=$PORTA_GIT_COMMIT
+LABEL PORTA_GIT_BRANCH=$PORTA_GIT_BRANCH
+
+ADD ba-logs-anonymizer ba-logs-anonymizer
+EXPOSE 3333
+ENTRYPOINT ["/ba-logs-anonymizer"]
