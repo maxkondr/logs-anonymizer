@@ -4,7 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -100,38 +103,47 @@ type SipLogEntryResponse struct {
 }
 
 func processSipLogEntry1(entry *SipLogEntry) SipLogEntry {
-	parsedText := entry.SipLogMessage
+	var parsedText []byte
+	// parsedText := entry.SipLogMessage
 	if entry.Type == "sip" {
-		parsedText = sipanonymizer.ProcessMessage([]byte(entry.SipLogMessage))
+		// parsedText = .sipanonymizer.ProcessMessage([]byte(entry.SipLogMessage))
+		parsedText = []byte(entry.SipLogMessage)
+		sipanonymizer.ProcessMessage(parsedText)
 	}
+	// else {
+	// 	parsedText = entry.SipLogMessage
+	// }
 
 	return SipLogEntry{MetaInfo: entry.MetaInfo,
 		Type:          entry.Type,
-		SipLogMessage: parsedText}
+		SipLogMessage: string(parsedText)}
 }
 
 func NewSipLogEntryResponse1(req *SipLogEntryRequest) *SipLogEntryResponse {
 	resp := &SipLogEntryResponse{GlobalMetaInfo: req.GlobalMetaInfo}
-	resp.LogEntries = make([]SipLogEntry, 0)
+	resp.LogEntries = make([]SipLogEntry, 0, len(req.LogEntries))
 
 	for _, entry := range req.LogEntries {
-		respEntry := processSipLogEntry1(&entry)
-		resp.LogEntries = append(resp.LogEntries, respEntry)
+		// respEntry := processSipLogEntry1(&entry)
+		// resp.LogEntries = append(resp.LogEntries, respEntry)
+		resp.LogEntries = append(resp.LogEntries, processSipLogEntry1(&entry))
 	}
 	return resp
 }
 
 func processSipLogEntry2(entry *SipLogEntry) *SipLogEntry {
-	var parsedText string
+	// var parsedText string
 	if entry.Type == "sip" {
-		parsedText = sipanonymizer.ProcessMessage([]byte(entry.SipLogMessage))
-	} else {
-		parsedText = entry.SipLogMessage
+		// parsedText = sipanonymizer.ProcessMessage([]byte(entry.SipLogMessage))
+		sipanonymizer.ProcessMessage([]byte(entry.SipLogMessage))
 	}
+	// } else {
+	// 	parsedText = entry.SipLogMessage
+	// }
 
 	return &SipLogEntry{MetaInfo: entry.MetaInfo,
 		Type:          entry.Type,
-		SipLogMessage: parsedText}
+		SipLogMessage: entry.SipLogMessage}
 }
 
 type channelResult struct {
@@ -185,10 +197,8 @@ func sipHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// fmt.Printf("%+v\n", sipMsgReq)
-
-	// resp := NewSipLogEntryResponse1(sipMsgReq)
-	resp := NewSipLogEntryResponse2(sipMsgReq)
+	resp := NewSipLogEntryResponse1(sipMsgReq)
+	// resp := NewSipLogEntryResponse2(sipMsgReq)
 
 	if resp != nil {
 		render.Status(r, http.StatusOK)
@@ -198,10 +208,6 @@ func sipHandler(w http.ResponseWriter, r *http.Request) {
 		render.Render(w, r, nil)
 	}
 }
-
-// func beHandler(w http.ResponseWriter, r *http.Request) {
-// 	w.Write([]byte("be"))
-// }
 
 func main() {
 	flag.Parse()
@@ -215,11 +221,18 @@ func main() {
 	r.Use(render.SetContentType(render.ContentTypeJSON))
 
 	r.Post("/sip", sipHandler)
-	// r.Get("/be", beHandler)
 
 	fmt.Println("Start listening on port 3333")
-	if err := http.ListenAndServe(":3333", r); err != nil {
-		fmt.Println("Error: ", err)
-	}
+	go func() {
+		if err := http.ListenAndServe(":3333", r); err != nil {
+			fmt.Println("Error: ", err)
+		}
+	}()
 
+	ch := make(chan os.Signal, 10)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+	<-ch
+	close(ch)
+
+	fmt.Println("Finished")
 }
