@@ -229,6 +229,7 @@ func main() {
 		}
 	}()
 
+	// Listen for OS signals
 	ch := make(chan os.Signal, 10)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 	<-ch
